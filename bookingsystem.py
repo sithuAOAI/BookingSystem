@@ -3,8 +3,10 @@ from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, 
 from pydantic import BaseModel
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
-DATABASE_URL = "mysql://USERNAME:PASSWORD@localhost/DATABASE_NAME"
+DATABASE_URL = "mysql+pymysql://root:geniusraver27@localhost/meeting_room_bookings"
+
 engine = create_engine(DATABASE_URL)
 metadata = MetaData()
 
@@ -17,6 +19,11 @@ class Booking(Base):
     room = Column(String, index=True)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
+
+class BookingRequest(BaseModel):
+    room: str
+    start_time: datetime
+    end_time: datetime
 
 class CoffeeMenu(Base):
     __tablename__ = "coffee_menu"
@@ -37,21 +44,17 @@ class CoffeeOrder(Base):
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-
 app = FastAPI()
 
 @app.post("/create_booking")
-def create_booking(room: str, start_time: str, end_time: str):
+def create_booking(booking_request: BookingRequest):
     db = SessionLocal()
-    booking = Booking(room=room, start_time=start_time, end_time=end_time)
+    booking = Booking(room=booking_request.room, start_time=booking_request.start_time, end_time=booking_request.end_time)
     db.add(booking)
     db.commit()
     db.refresh(booking)
     db.close()
-    return {id: booking.id, room: booking.room, start_time: booking.start_time, end_time: booking.end_time}
-    # return {"id": booking.id}
-
+    return {"id": booking.id, "room": booking.room, "start_time": booking.start_time, "end_time": booking.end_time}
 
 @app.get("/read_booking/{booking_id}")
 def read_booking(booking_id: int):
@@ -100,8 +103,7 @@ def get_coffee_menu():
     db = SessionLocal()
     menu_items = db.query(CoffeeMenu).all()
     db.close()
-    return [{"id": item.id, "coffee_name": item.coffee_name, "price": item.price, "description": item.description} for item in menu_items]
-
+    return [{"id": item.id, "coffee_name": item.coffee_type, "price": item.price, "description": item.description} for item in menu_items]
 
 @app.post("/order_coffee")
 def order_coffee(room: str, coffee_type: str, quantity: int):
@@ -111,8 +113,7 @@ def order_coffee(room: str, coffee_type: str, quantity: int):
     db.commit()
     db.refresh(order)
     db.close()
-    return {id: order.id, room: order.room, coffee_type: order.coffee_type, quantity: order.quantity}
-
+    return {"id": order.id, "room": order.room, "coffee_type": order.coffee_type, "quantity": order.quantity}
 
 if __name__ == "__main__":
     import uvicorn
