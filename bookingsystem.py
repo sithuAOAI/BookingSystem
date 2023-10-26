@@ -5,8 +5,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-DATABASE_URL = "mysql+pymysql://root:geniusraver27@localhost/meeting_room_bookings"
+#DATABASE_URL = "mysql+pymysql://root:geniusraver27@localhost/meeting_room_bookings"
 
+DATABASE_URL = "mysql+pymysql://bookings_user:password@localhost/meeting_room_bookings"
 engine = create_engine(DATABASE_URL)
 metadata = MetaData()
 
@@ -117,4 +118,6 @@ def order_coffee(room: str, coffee_type: str, quantity: int):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
+
+    
