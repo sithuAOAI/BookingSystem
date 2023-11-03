@@ -36,7 +36,7 @@ class MeetingRoomBooking(Base):
     date = Column(Date)
     start_time = Column(Time)
     end_time = Column(Time)
-    duration = Column(Time)
+    duration = Column(String)
     attendees = Column(Integer)
 
 
@@ -47,7 +47,7 @@ class BookingRequest(BaseModel):
     date: date
     start_time: time
     end_time: time
-    duration: time
+    duration: str
     attendees: int
 
 class CoffeeMenu(Base):
@@ -63,8 +63,9 @@ class CoffeeOrder(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    order_price = Column(Integer)
     customer_name = Column(String)
+    coffee_type = Column(String(255))
+    num_coffees = Column(Integer)
     order_date = Column(String)
     order_time = Column(Time)
     expected_time = Column(Time)
@@ -72,27 +73,15 @@ class CoffeeOrder(Base):
     pickup_status = Column(String)
 
 class OrderRequest(BaseModel):
-    order_price: int
     customer_name: str
+    coffee_type: str
+    num_coffees: int
     order_date: date
     order_time: time
     expected_time: time
     booking_id: int
     pickup_status: str
     
-class OrderItem(Base):
-    __tablename__ = "order_items"
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), index=True)
-    menu_name = Column(String)
-    menu_price = Column(Integer)
-    quantity = Column(Integer)
-
-class OrderItemRequest(BaseModel):
-    menu_name: str
-    menu_price: int
-    quantity: int
-
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -149,6 +138,15 @@ def read_all_bookings():
     db.close()
     return [{"booking_id": b.booking_id, "booking_subject": b.booking_subject, "room_id": b.room_id, "applicant_name": b.applicant_name, "date": b.date, "start_time": b.start_time, "end_time": b.end_time, "duration": b.duration, "attendees": b.attendees} for b in bookings]
 
+@app.get("/available_rooms")
+def get_available_rooms(date: date, start_time: time, end_time: time):
+    db = SessionLocal()
+    bookings = db.query(MeetingRoomBooking).filter(MeetingRoomBooking.date == date).all()
+    db.close()
+    booked_rooms = [b.room_id for b in bookings if b.start_time <= start_time <= b.end_time or b.start_time <= end_time <= b.end_time]
+    available_rooms = db.query(MeetingRoom).filter(MeetingRoom.room_id.notin_(booked_rooms)).all()
+    return [{"room_id": r.room_id, "room_name": r.room_name, "building_location": r.building_location, "capacity": r.capacity, "tv": r.tv, "blackboard": r.blackboard, "photo_location": r.photo_location} for r in available_rooms]
+
 @app.put("/update_booking/{booking_id}")
 def update_booking(booking_id: int, booking_request: BookingRequest):
     db = SessionLocal()
@@ -194,19 +192,14 @@ def read_coffee_orders():
     db.close()
     return coffee_orders
 
-@app.get("/order_items")
-def read_order_items():
-    db = SessionLocal()
-    order_items = db.query(OrderItem).all()
-    db.close()
-    return order_items
 
 @app.post("/order_coffee")
 def order_coffee(order_request: OrderRequest):
     db = SessionLocal()
     order = CoffeeOrder(
-        order_price=order_request.order_price,
         customer_name=order_request.customer_name,
+        coffee_type=order_request.coffee_type,
+        num_coffees=order_request.num_coffees,
         order_date=order_request.order_date,
         order_time=order_request.order_time,
         expected_time=order_request.expected_time,
@@ -217,23 +210,7 @@ def order_coffee(order_request: OrderRequest):
     db.commit()
     db.refresh(order)
     db.close()
-    return {"id": order.id, "order_price": order.order_price, "customer_name": order.customer_name, "order_date": order.order_date, "order_time": order.order_time, "expected_time": order.expected_time, "booking_id": order.booking_id, "pickup_status": order.pickup_status}
-
-@app.post("/order_item")
-def create_order_item(order_id: int, item_request: OrderItemRequest):
-    db = SessionLocal()
-    order_item = OrderItem(
-        id=None,
-        order_id=order_id,
-        menu_name=item_request.menu_name,
-        menu_price=item_request.menu_price,
-        quantity=item_request.quantity
-    )
-    db.add(order_item)
-    db.commit()
-    db.refresh(order_item)
-    db.close()
-    return {"id": order_item.id, "order_id": order_item.order_id, "menu_name": order_item.menu_name, "menu_price": order_item.menu_price, "quantity": order_item.quantity}
+    return {"id": order.id, "customer_name": order.customer_name,"coffee_type": order.coffee_type,"num_coffees": order.num_coffees, "order_date": order.order_date, "order_time": order.order_time, "expected_time": order.expected_time, "booking_id": order.booking_id, "pickup_status": order.pickup_status}
 
 if __name__ == "__main__":
     import uvicorn
